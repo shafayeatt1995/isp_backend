@@ -1,11 +1,11 @@
 const http = require("http");
+const { Server } = require("socket.io");
 const socketServer = (app) => {
   const server = http.createServer(app);
-  const io = require("socket.io")(server, {
+  const io = new Server(server, {
     cors: {
       origin: process.env.BASE_URL,
       methods: ["GET", "POST"],
-      transports: ["websocket", "polling"],
       credentials: true,
     },
     allowEIO3: true,
