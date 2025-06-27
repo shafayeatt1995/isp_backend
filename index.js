@@ -5,7 +5,7 @@ const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const MongoStore = require("connect-mongo");
 const { socketServer } = require("./socket");
-require("./config/mongo");
+require("./middleware/config/mongo");
 
 const app = express();
 const port = process.env.PORT || 3000;
