@@ -27,8 +27,12 @@ app.use(
 );
 app.use(express.json());
 
+app.use((req, res, next) => {
+  console.log(`[${req.method}] > ${req.url}`);
+  next();
+});
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  return res.send("Hello World!");
 });
 app.use("/", require("./routes"));
 

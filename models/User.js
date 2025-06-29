@@ -13,10 +13,11 @@ const UserSchema = new Schema(
       trim: true,
     },
     password: { type: String, required: true, select: false },
-    avatar: { type: String, default: "/images/avatar/1.webp" },
+    avatar: { type: String, default: "/1.webp" },
     suspended: { type: Boolean, default: false, select: false },
     power: { type: Number, default: 1, select: false },
-    mobile: { type: String },
+    type: { type: String, required: true, enum: ["user", "reseller", "admin"] },
+    mobile: { type: String, default: "" },
   },
   {
     strict: true,

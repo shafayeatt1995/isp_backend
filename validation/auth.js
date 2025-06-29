@@ -9,9 +9,9 @@ const validate = {
       .custom(async (value, { req }) => {
         try {
           const { id } = req.body;
-          const user = await User.findOne({ id: value }).select(
-            "+password +suspended"
-          );
+          const user = await User.findOne({ id: value })
+            .select("+password +suspended +power")
+            .lean();
           if (user) {
             const check = await bcrypt.compare(
               req.body.password,
