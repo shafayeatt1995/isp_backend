@@ -1,9 +1,9 @@
 const express = require("express");
-const { User, Business } = require("../../models");
-const { paginate, sleep, toggle } = require("../../utils");
+const { User, Package } = require("../../models");
+const { paginate, toggle } = require("../../utils");
 const { userEditVal } = require("../../validation/user");
 const { validation } = require("../../validation");
-const { businessCreateVal } = require("../../validation/business");
+const { packageCreateVal } = require("../../validation/package");
 const router = express.Router();
 
 router.post("/fetch", async (req, res) => {
@@ -12,15 +12,20 @@ router.post("/fetch", async (req, res) => {
     const matchQuery = {};
     if (keyword) matchQuery[searchBy] = { $regex: keyword, $options: "i" };
 
-    const [businesses, total] = await Promise.all([
-      Business.aggregate([
+    const [packages, total] = await Promise.all([
+      Package.aggregate([
         { $match: matchQuery },
         { $sort: sort },
         ...paginate(page, perPage),
+        {
+          $project: {
+            refID: 0,
+          },
+        },
       ]),
-      Business.countDocuments(matchQuery),
+      Package.countDocuments(matchQuery),
     ]);
-    return res.send({ businesses, total });
+    return res.send({ packages, total });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message });
@@ -56,9 +61,8 @@ router.post("/batch-toggle-suspend", async (req, res) => {
 });
 router.post("/batch-delete", async (req, res) => {
   try {
-    const { _id } = req.user;
     const { ids } = req.body;
-    await User.deleteMany({ _id: { $in: ids, $ne: _id } });
+    await Package.deleteMany({ _id: { $in: ids }, refID: "admin" });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
@@ -67,35 +71,38 @@ router.post("/batch-delete", async (req, res) => {
 });
 router.post("/delete", async (req, res) => {
   try {
-    const { _id } = req.user;
-    const { user } = req.body;
-    await User.deleteOne({ $and: [{ _id: user._id }, { _id: { $ne: _id } }] });
+    const { pack } = req.body;
+    await Package.deleteOne({ _id: pack._id, refID: "admin" });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/add", businessCreateVal, validation, async (req, res) => {
+router.post("/add", packageCreateVal, validation, async (req, res) => {
   try {
-    const { name: refName } = req.user;
-    const { name } = req.body;
-    await Business.create({ name, refName });
+    const { name, staticIP, price, vatType, vatAmount } = req.body;
+    await Package.create({
+      refID: "admin",
+      name,
+      staticIP,
+      price,
+      vatType,
+      vatAmount,
+    });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/edit", userEditVal, validation, async (req, res) => {
+router.post("/edit", packageCreateVal, validation, async (req, res) => {
   try {
-    const { name, id, password, mobile, type, _id } = req.body;
-    const body = { name, id, mobile, type };
-    if (password) {
-      body.password = password;
-      body.pass = password;
-    }
-    await User.updateOne({ _id }, body);
+    const { _id, name, staticIP, price, vatType, vatAmount } = req.body;
+    await Package.updateOne(
+      { _id },
+      { name, staticIP, price, vatType, vatAmount }
+    );
 
     return res.send({ success: true });
   } catch (error) {

@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { User } = require("../models");
 const isAuthenticated = require("../middleware/isAuthenticated");
+const isAdmin = require("../middleware/isAdmin");
 
 router.get("/anik", async (req, res) => {
   try {
@@ -15,6 +15,8 @@ router.use("/auth", require("./auth"));
 
 router.use(isAuthenticated);
 router.use("/user", require("./user"));
+
+router.use(isAdmin);
 router.use("/admin", require("./admin"));
 
 module.exports = router;

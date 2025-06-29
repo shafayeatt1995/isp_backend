@@ -5,6 +5,8 @@ const Schema = mongoose.Schema;
 
 const UserSchema = new Schema(
   {
+    businessID: { type: Schema.Types.ObjectId, ref: "Business" },
+    refName: { type: String, required: true, trim: true },
     name: { type: String, required: true, trim: true },
     id: {
       type: String,

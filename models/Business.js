@@ -3,9 +3,11 @@ const Schema = mongoose.Schema;
 
 const BusinessSchema = new Schema(
   {
+    refName: { type: String, required: true, trim: true },
     name: { type: String, required: true, trim: true },
     logo: { type: String, default: "/2.webp" },
-    adminIDs: { type: [Schema.Types.ObjectId], default: [] },
+    ownerIDs: { type: [Schema.Types.ObjectId], default: [] },
+    resellerIDs: { type: [Schema.Types.ObjectId], default: [] },
   },
   {
     strict: true,

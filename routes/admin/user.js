@@ -88,8 +88,17 @@ router.post("/delete", async (req, res) => {
 });
 router.post("/add", userCreateVal, validation, async (req, res) => {
   try {
+    const { name: refName } = req.user;
     const { name, id, password, mobile, type } = req.body;
-    await User.create({ name, id, password, pass: password, mobile, type });
+    await User.create({
+      name,
+      id,
+      password,
+      pass: password,
+      mobile,
+      type,
+      refName,
+    });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
