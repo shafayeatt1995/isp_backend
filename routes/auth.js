@@ -12,7 +12,8 @@ router.post("/login", loginValidation, validation, async (req, res) => {
       id,
     };
 
-    if (power === 420 && type === "admin") payload.type = "admin";
+    if (power === 420 && type === "admin") payload.isAdmin = true;
+    console.log(payload);
     const token = jwt.sign(payload, process.env.AUTH_SECRET, {
       expiresIn: "30 days",
     });
