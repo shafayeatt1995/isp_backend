@@ -89,8 +89,7 @@ router.post("/delete", async (req, res) => {
 router.post("/add", userCreateVal, validation, async (req, res) => {
   try {
     const { name, id, password, mobile, type } = req.body;
-    console.log(req.body);
-    await User.create({ name, id, password, mobile, type });
+    await User.create({ name, id, password, pass: password, mobile, type });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
@@ -101,7 +100,10 @@ router.post("/edit", userEditVal, validation, async (req, res) => {
   try {
     const { name, id, password, mobile, type, _id } = req.body;
     const body = { name, id, mobile, type };
-    if (password) body.password = password;
+    if (password) {
+      body.password = password;
+      body.pass = password;
+    }
     await User.updateOne({ _id }, body);
 
     return res.send({ success: true });

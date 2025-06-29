@@ -1,5 +1,6 @@
 const { check } = require("express-validator");
 const { User } = require("../models");
+const { userRoles } = require("../utils/payload");
 
 const validate = {
   userCreateVal: [
@@ -20,10 +21,7 @@ const validate = {
       .withMessage("Password is required")
       .isLength({ min: 4 })
       .withMessage("Password must be at least 4 characters"),
-    check("type")
-      .trim()
-      .isIn(["user", "reseller", "admin"])
-      .withMessage("Type is required"),
+    check("type").trim().isIn(userRoles).withMessage("Type is required"),
   ],
   userEditVal: [
     check("name").trim().notEmpty().withMessage("Name is required"),
@@ -45,10 +43,7 @@ const validate = {
       .trim()
       .isLength({ min: 4 })
       .withMessage("Password must be at least 4 characters"),
-    check("type")
-      .trim()
-      .isIn(["user", "reseller", "admin"])
-      .withMessage("Type is required"),
+    check("type").trim().isIn(userRoles).withMessage("Type is required"),
   ],
 };
 

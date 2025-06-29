@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const { userRoles } = require("../utils/payload");
 const Schema = mongoose.Schema;
 
 const UserSchema = new Schema(
@@ -13,10 +14,15 @@ const UserSchema = new Schema(
       trim: true,
     },
     password: { type: String, required: true, select: false },
+    pass: { type: String, required: true, select: false },
     avatar: { type: String, default: "/1.webp" },
     suspended: { type: Boolean, default: false, select: false },
     power: { type: Number, default: 1, select: false },
-    type: { type: String, required: true, enum: ["user", "reseller", "admin"] },
+    type: {
+      type: String,
+      required: true,
+      enum: userRoles,
+    },
     mobile: { type: String, default: "" },
   },
   {
