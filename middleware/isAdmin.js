@@ -1,5 +1,3 @@
-const jwt = require("jsonwebtoken");
-
 const isAdmin = async (req, res, next) => {
   try {
     const { isAdmin } = req.user;

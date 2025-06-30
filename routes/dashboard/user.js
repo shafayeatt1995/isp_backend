@@ -1,15 +1,24 @@
 const express = require("express");
-const { User } = require("../../models");
-const { paginate, sleep, toggle } = require("../../utils");
+const mongoose = require("mongoose");
+const { User, Business } = require("../../models");
+const { paginate, sleep, toggle, objectID } = require("../../utils");
 const { userCreateVal, userEditVal } = require("../../validation/user");
 const { validation } = require("../../validation");
 const router = express.Router();
 
 router.post("/fetch", async (req, res) => {
   try {
+    const { businessID } = req.user;
     const { page, perPage, keyword, searchBy, sort } = req.body;
-    const matchQuery = {};
-    if (keyword) matchQuery[searchBy] = { $regex: keyword, $options: "i" };
+
+    const matchQuery = {
+      $and: [
+        { businessID: objectID(businessID) },
+        ...(keyword
+          ? [{ [searchBy]: { $regex: keyword, $options: "i" } }]
+          : []),
+      ],
+    };
 
     const [users, total] = await Promise.all([
       User.aggregate([
@@ -25,11 +34,14 @@ router.post("/fetch", async (req, res) => {
             name: 1,
             suspended: 1,
             type: 1,
+            refName: 1,
+            permissions: 1,
           },
         },
       ]),
       User.countDocuments(matchQuery),
     ]);
+
     return res.send({ users, total });
   } catch (error) {
     console.error(error);
@@ -38,10 +50,16 @@ router.post("/fetch", async (req, res) => {
 });
 router.post("/toggle-suspend", async (req, res) => {
   try {
-    const { _id } = req.user;
+    const { businessID, _id } = req.user;
     const { user } = req.body;
     await User.updateOne(
-      { $and: [{ _id: user._id }, { _id: { $ne: _id } }] },
+      {
+        $and: [
+          { _id: objectID(user._id) },
+          { _id: { $ne: _id } },
+          { businessID: objectID(businessID) },
+        ],
+      },
       toggle("suspended")
     );
     return res.send({ success: true });
@@ -52,10 +70,15 @@ router.post("/toggle-suspend", async (req, res) => {
 });
 router.post("/batch-toggle-suspend", async (req, res) => {
   try {
-    const { _id } = req.user;
+    const { businessID, _id } = req.user;
     const { ids, suspend } = req.body;
     await User.updateMany(
-      { _id: { $in: ids, $ne: _id } },
+      {
+        $and: [
+          { _id: { $in: ids, $ne: _id } },
+          { businessID: objectID(businessID) },
+        ],
+      },
       { suspended: suspend }
     );
     return res.send({ success: true });
@@ -65,55 +88,132 @@ router.post("/batch-toggle-suspend", async (req, res) => {
   }
 });
 router.post("/batch-delete", async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const { _id } = req.user;
+    const { _id, businessID } = req.user;
     const { ids } = req.body;
-    await User.deleteMany({ _id: { $in: ids, $ne: _id } });
+    for (const id of ids) {
+      if (_id !== id) {
+        const user = await User.findOneAndDelete(
+          {
+            $and: [{ _id: objectID(id) }, { businessID: objectID(businessID) }],
+          },
+          { session }
+        );
+        await Business.updateOne(
+          { _id: objectID(businessID) },
+          { $pull: { [user.type + "IDs"]: objectID(id) } },
+          { session }
+        );
+      }
+    }
+    await session.commitTransaction();
+    await session.endSession();
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
+    await session.abortTransaction();
+    await session.endSession();
     return res.status(500).json({ error: error.message });
   }
 });
 router.post("/delete", async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const { _id } = req.user;
+    const { _id, businessID } = req.user;
     const { user } = req.body;
-    await User.deleteOne({ $and: [{ _id: user._id }, { _id: { $ne: _id } }] });
+    if (_id !== user._id) {
+      await User.deleteOne(
+        {
+          $and: [
+            { _id: objectID(user._id) },
+            { businessID: objectID(businessID) },
+          ],
+        },
+        { session }
+      );
+      await Business.updateOne(
+        { _id: objectID(businessID) },
+        { $pull: { [user.type + "IDs"]: objectID(user._id) } },
+        { session }
+      );
+    }
+
+    await session.commitTransaction();
+    await session.endSession();
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
+    await session.abortTransaction();
+    await session.endSession();
     return res.status(500).json({ error: error.message });
   }
 });
 router.post("/add", userCreateVal, validation, async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const { name: refName } = req.user;
+    const { name: refName, businessID } = req.user;
     const { name, id, password, mobile, type } = req.body;
-    await User.create({
-      name,
-      id,
-      password,
-      pass: password,
-      mobile,
-      type,
-      refName,
-    });
+    const [user] = await User.create(
+      [
+        {
+          name,
+          id,
+          password,
+          pass: password,
+          mobile,
+          type,
+          refName,
+          businessID,
+        },
+      ],
+      { session }
+    );
+    await Business.updateOne(
+      { _id: objectID(businessID) },
+      { $push: { [type + "IDs"]: objectID(user._id) } },
+      { session }
+    );
+
+    await session.commitTransaction();
+    await session.endSession();
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
+    await session.abortTransaction();
+    await session.endSession();
     return res.status(500).json({ error: error.message });
   }
 });
 router.post("/edit", userEditVal, validation, async (req, res) => {
   try {
-    const { name, id, password, mobile, type, _id } = req.body;
-    const body = { name, id, mobile, type };
+    const { name, id, password, mobile, _id } = req.body;
+    const body = { name, id, mobile };
     if (password) {
       body.password = password;
       body.pass = password;
     }
     await User.updateOne({ _id }, body);
+
+    return res.send({ success: true });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+router.post("/update-permission", async (req, res) => {
+  try {
+    const { businessID } = req.user;
+    const { permissions, _id } = req.body?.user;
+    await User.updateOne(
+      {
+        $and: [{ businessID: objectID(businessID) }, { _id: objectID(_id) }],
+      },
+      { permissions }
+    );
 
     return res.send({ success: true });
   } catch (error) {

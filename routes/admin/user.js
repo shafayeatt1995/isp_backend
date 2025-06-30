@@ -25,6 +25,7 @@ router.post("/fetch", async (req, res) => {
             name: 1,
             suspended: 1,
             type: 1,
+            refName: 1,
           },
         },
       ]),

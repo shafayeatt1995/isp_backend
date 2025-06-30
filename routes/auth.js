@@ -6,20 +6,21 @@ const jwt = require("jsonwebtoken");
 
 router.post("/login", loginValidation, validation, async (req, res) => {
   try {
-    const { _id, id, name, power, type, business } = req.user;
+    const { _id, id, name, power, type, business, permissions } = req.user;
     const payload = {
       _id,
       id,
       name,
     };
-
     if (power === 420 && type === "admin") payload.isAdmin = true;
     if (business) {
+      payload.businessID = business._id;
       const _idStr = _id.toString();
       if (business.ownerIDs.some((id) => id.toString() === _idStr))
         payload.isOwner = true;
       if (business.resellerIDs.some((id) => id.toString() === _idStr))
         payload.isReseller = true;
+      if (permissions) payload.permissions = permissions;
     }
 
     const token = jwt.sign(payload, process.env.AUTH_SECRET, {
