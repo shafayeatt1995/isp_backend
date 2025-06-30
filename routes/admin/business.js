@@ -1,11 +1,45 @@
 const express = require("express");
-const { User, Business } = require("../../models");
-const { paginate, sleep, toggle } = require("../../utils");
-const { userEditVal } = require("../../validation/user");
+const mongoose = require("mongoose");
+const { Business, User } = require("../../models");
+const { paginate, objectID } = require("../../utils");
 const { validation } = require("../../validation");
 const { businessCreateVal } = require("../../validation/business");
 const router = express.Router();
 
+router.post("/", async (req, res) => {
+  try {
+    const { business, type } = req.body;
+    let lookup = {};
+    if (type === "owner") {
+      lookup = {
+        $lookup: {
+          from: "users",
+          localField: "ownerIDs",
+          foreignField: "_id",
+          as: "owners",
+        },
+      };
+    } else {
+      lookup = {
+        $lookup: {
+          from: "users",
+          localField: "resellerIDs",
+          foreignField: "_id",
+          as: "resellers",
+        },
+      };
+    }
+    const [item] = await Business.aggregate([
+      { $match: { _id: objectID(business._id) } },
+      { $limit: 1 },
+      lookup,
+    ]);
+    return res.json({ business: item });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+});
 router.post("/fetch", async (req, res) => {
   try {
     const { page, perPage, keyword, searchBy, sort } = req.body;
@@ -26,39 +60,10 @@ router.post("/fetch", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/toggle-suspend", async (req, res) => {
-  try {
-    const { _id } = req.user;
-    const { user } = req.body;
-    await User.updateOne(
-      { $and: [{ _id: user._id }, { _id: { $ne: _id } }] },
-      toggle("suspended")
-    );
-    return res.send({ success: true });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-router.post("/batch-toggle-suspend", async (req, res) => {
-  try {
-    const { _id } = req.user;
-    const { ids, suspend } = req.body;
-    await User.updateMany(
-      { _id: { $in: ids, $ne: _id } },
-      { suspended: suspend }
-    );
-    return res.send({ success: true });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
-  }
-});
 router.post("/batch-delete", async (req, res) => {
   try {
-    const { _id } = req.user;
     const { ids } = req.body;
-    await User.deleteMany({ _id: { $in: ids, $ne: _id } });
+    await Business.deleteMany({ _id: { $in: ids } });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
@@ -67,9 +72,8 @@ router.post("/batch-delete", async (req, res) => {
 });
 router.post("/delete", async (req, res) => {
   try {
-    const { _id } = req.user;
-    const { user } = req.body;
-    await User.deleteOne({ $and: [{ _id: user._id }, { _id: { $ne: _id } }] });
+    const { business } = req.body;
+    await Business.deleteOne({ _id: business._id });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
@@ -79,27 +83,88 @@ router.post("/delete", async (req, res) => {
 router.post("/add", businessCreateVal, validation, async (req, res) => {
   try {
     const { name: refName } = req.user;
-    const { name } = req.body;
-    await Business.create({ name, refName });
+    const { name, expire } = req.body;
+    await Business.create({ name, refName, exp: new Date(expire) });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/edit", userEditVal, validation, async (req, res) => {
+router.post("/edit", businessCreateVal, validation, async (req, res) => {
   try {
-    const { name, id, password, mobile, type, _id } = req.body;
-    const body = { name, id, mobile, type };
-    if (password) {
-      body.password = password;
-      body.pass = password;
-    }
-    await User.updateOne({ _id }, body);
-
+    const { name, expire, _id } = req.body;
+    await Business.updateOne({ _id }, { name, exp: new Date(expire) });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+router.get("/search-user", async (req, res) => {
+  try {
+    const { id } = req.query;
+    const users = await User.aggregate([
+      {
+        $match: {
+          id: { $regex: id, $options: "i" },
+          suspended: false,
+          businessID: { $exists: false },
+          type: { $ne: "admin" },
+        },
+      },
+      { $limit: 30 },
+      { $project: { avatar: 1, id: 1, name: 1 } },
+    ]);
+    return res.json({ users });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+router.post("/update-user", async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { business, type, users } = req.body;
+
+    if (
+      !business?._id ||
+      !["owner", "reseller"].includes(type) ||
+      !Array.isArray(users)
+    ) {
+      throw new Error("Invalid request data");
+    }
+
+    const userIds = users.map(({ _id }) => objectID(_id));
+
+    const updateField =
+      type === "owner" ? { ownerIDs: userIds } : { resellerIDs: userIds };
+
+    console.log(updateField);
+    await Business.updateOne({ _id: objectID(business._id) }, updateField, {
+      session,
+    });
+    await User.updateMany(
+      { _id: { $in: userIds } },
+      {
+        $set: {
+          businessID: objectID(business._id),
+          type,
+        },
+      },
+      { session }
+    );
+
+    await session.commitTransaction();
+    await session.endSession();
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    await session.abortTransaction();
+    await session.endSession();
     return res.status(500).json({ error: error.message });
   }
 });

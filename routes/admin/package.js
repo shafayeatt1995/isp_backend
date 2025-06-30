@@ -1,7 +1,6 @@
 const express = require("express");
-const { User, Package } = require("../../models");
-const { paginate, toggle } = require("../../utils");
-const { userEditVal } = require("../../validation/user");
+const { Package } = require("../../models");
+const { paginate } = require("../../utils");
 const { validation } = require("../../validation");
 const { packageCreateVal } = require("../../validation/package");
 const router = express.Router();
@@ -26,34 +25,6 @@ router.post("/fetch", async (req, res) => {
       Package.countDocuments(matchQuery),
     ]);
     return res.send({ packages, total });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-router.post("/toggle-suspend", async (req, res) => {
-  try {
-    const { _id } = req.user;
-    const { user } = req.body;
-    await User.updateOne(
-      { $and: [{ _id: user._id }, { _id: { $ne: _id } }] },
-      toggle("suspended")
-    );
-    return res.send({ success: true });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-router.post("/batch-toggle-suspend", async (req, res) => {
-  try {
-    const { _id } = req.user;
-    const { ids, suspend } = req.body;
-    await User.updateMany(
-      { _id: { $in: ids, $ne: _id } },
-      { suspended: suspend }
-    );
-    return res.send({ success: true });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message });
