@@ -1,5 +1,5 @@
 const { check } = require("express-validator");
-const { User } = require("../models");
+const { User, Business } = require("../models");
 const bcrypt = require("bcryptjs");
 
 const validate = {
@@ -21,7 +21,14 @@ const validate = {
               if (user.suspended) {
                 throw new Error(`Account suspended`);
               } else {
-                req.user = user;
+                let business = null;
+                if (user.businessID) {
+                  business = await Business.findOne({
+                    _id: user.businessID,
+                    exp: { $gte: new Date() },
+                  }).lean();
+                }
+                req.user = { ...user, business };
               }
             } else {
               throw new Error(`Login failed. Invalid credentials.`);

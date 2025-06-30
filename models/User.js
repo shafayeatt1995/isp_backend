@@ -26,6 +26,7 @@ const UserSchema = new Schema(
       enum: userRoles,
     },
     mobile: { type: String, default: "" },
+    permissions: { type: [String] },
   },
   {
     strict: true,

@@ -130,6 +130,7 @@ router.post("/update-user", async (req, res) => {
 
   try {
     const { business, type, users } = req.body;
+
     if (
       !business?._id ||
       !["owner", "reseller"].includes(type) ||
@@ -139,20 +140,21 @@ router.post("/update-user", async (req, res) => {
     }
 
     const userIds = users.map(({ _id }) => objectID(_id));
+
     const updateField =
       type === "owner" ? { ownerIDs: userIds } : { resellerIDs: userIds };
-    const userBody = {
-      businessID: objectID(business._id),
-      type,
-    };
-    if (type === "reseller") userBody.permissions = [];
 
     await Business.updateOne({ _id: objectID(business._id) }, updateField, {
       session,
     });
     await User.updateMany(
       { _id: { $in: userIds } },
-      { $set: userBody },
+      {
+        $set: {
+          businessID: objectID(business._id),
+          type,
+        },
+      },
       { session }
     );
 
