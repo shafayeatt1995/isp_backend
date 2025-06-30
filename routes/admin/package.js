@@ -16,11 +16,6 @@ router.post("/fetch", async (req, res) => {
         { $match: matchQuery },
         { $sort: sort },
         ...paginate(page, perPage),
-        {
-          $project: {
-            refID: 0,
-          },
-        },
       ]),
       Package.countDocuments(matchQuery),
     ]);
@@ -33,7 +28,7 @@ router.post("/fetch", async (req, res) => {
 router.post("/batch-delete", async (req, res) => {
   try {
     const { ids } = req.body;
-    await Package.deleteMany({ _id: { $in: ids }, refID: "admin" });
+    await Package.deleteMany({ _id: { $in: ids }, refName: "admin" });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
@@ -43,7 +38,7 @@ router.post("/batch-delete", async (req, res) => {
 router.post("/delete", async (req, res) => {
   try {
     const { pack } = req.body;
-    await Package.deleteOne({ _id: pack._id, refID: "admin" });
+    await Package.deleteOne({ _id: pack._id, refName: "admin" });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
@@ -54,7 +49,7 @@ router.post("/add", packageCreateVal, validation, async (req, res) => {
   try {
     const { name, staticIP, price, vatType, vatAmount } = req.body;
     await Package.create({
-      refID: "admin",
+      refName: "admin",
       name,
       staticIP,
       price,

@@ -3,7 +3,8 @@ const Schema = mongoose.Schema;
 
 const PackageSchema = new Schema(
   {
-    refID: { type: Schema.Types.Mixed },
+    businessID: { type: Schema.Types.ObjectId, ref: "Business" },
+    refName: { type: String, required: true, trim: true },
     name: { type: String, required: true, trim: true },
     staticIP: { type: Boolean, default: false },
     price: { type: Number, required: true },

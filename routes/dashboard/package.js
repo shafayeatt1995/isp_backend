@@ -1,26 +1,29 @@
 const express = require("express");
 const { Package } = require("../../models");
-const { paginate } = require("../../utils");
+const { paginate, objectID } = require("../../utils");
 const { validation } = require("../../validation");
 const { packageCreateVal } = require("../../validation/package");
 const router = express.Router();
 
 router.post("/fetch", async (req, res) => {
   try {
+    const { businessID } = req.user;
     const { page, perPage, keyword, searchBy, sort } = req.body;
-    const matchQuery = {};
-    if (keyword) matchQuery[searchBy] = { $regex: keyword, $options: "i" };
+    const matchQuery = {
+      $and: [
+        { businessID: objectID(businessID) },
+        ...(keyword
+          ? [{ [searchBy]: { $regex: keyword, $options: "i" } }]
+          : []),
+      ],
+    };
 
     const [packages, total] = await Promise.all([
       Package.aggregate([
         { $match: matchQuery },
         { $sort: sort },
         ...paginate(page, perPage),
-        {
-          $project: {
-            refID: 0,
-          },
-        },
+        { $project: { businessID: 0 } },
       ]),
       Package.countDocuments(matchQuery),
     ]);
@@ -32,8 +35,12 @@ router.post("/fetch", async (req, res) => {
 });
 router.post("/batch-delete", async (req, res) => {
   try {
+    const { businessID } = req.user;
     const { ids } = req.body;
-    await Package.deleteMany({ _id: { $in: ids }, refID: "admin" });
+    await Package.deleteMany({
+      _id: { $in: ids },
+      businessID: objectID(businessID),
+    });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
@@ -43,7 +50,10 @@ router.post("/batch-delete", async (req, res) => {
 router.post("/delete", async (req, res) => {
   try {
     const { pack } = req.body;
-    await Package.deleteOne({ _id: pack._id, refID: "admin" });
+    await Package.deleteOne({
+      _id: pack._id,
+      businessID: objectID(pack.businessID),
+    });
     return res.send({ success: true });
   } catch (error) {
     console.error(error);
@@ -52,9 +62,11 @@ router.post("/delete", async (req, res) => {
 });
 router.post("/add", packageCreateVal, validation, async (req, res) => {
   try {
+    const { businessID, name: refName } = req.user;
     const { name, staticIP, price, vatType, vatAmount } = req.body;
     await Package.create({
-      refID: "admin",
+      businessID,
+      refName,
       name,
       staticIP,
       price,
@@ -69,10 +81,11 @@ router.post("/add", packageCreateVal, validation, async (req, res) => {
 });
 router.post("/edit", packageCreateVal, validation, async (req, res) => {
   try {
+    const { name: refName, businessID } = req.user;
     const { _id, name, staticIP, price, vatType, vatAmount } = req.body;
     await Package.updateOne(
-      { _id },
-      { name, staticIP, price, vatType, vatAmount }
+      { _id, businessID: objectID(businessID) },
+      { name, staticIP, price, vatType, vatAmount, refName }
     );
 
     return res.send({ success: true });
