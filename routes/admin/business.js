@@ -104,7 +104,9 @@ router.post("/edit", businessCreateVal, validation, async (req, res) => {
 router.get("/search-user", async (req, res) => {
   try {
     const { id } = req.query;
-    const users = await User.aggregate([
+    let users = [];
+    if (!id || typeof id !== "string" || !id.trim()) return res.json({ users });
+    users = await User.aggregate([
       {
         $match: {
           id: { $regex: id, $options: "i" },
