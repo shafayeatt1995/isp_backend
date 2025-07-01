@@ -3,9 +3,10 @@ const { Package } = require("../../models");
 const { paginate, objectID } = require("../../utils");
 const { validation } = require("../../validation");
 const { packageCreateVal } = require("../../validation/package");
+const pc = require("../../middleware/permission");
 const router = express.Router();
 
-router.post("/fetch", async (req, res) => {
+router.post("/fetch", pc("packageRead"), async (req, res) => {
   try {
     const { businessID } = req.user;
     const { page, perPage, keyword, searchBy, sort } = req.body;
@@ -33,7 +34,7 @@ router.post("/fetch", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/batch-delete", async (req, res) => {
+router.post("/batch-delete", pc("packageDelete"), async (req, res) => {
   try {
     const { businessID } = req.user;
     const { ids } = req.body;
@@ -47,7 +48,7 @@ router.post("/batch-delete", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/delete", async (req, res) => {
+router.post("/delete", pc("packageDelete"), async (req, res) => {
   try {
     const { pack } = req.body;
     await Package.deleteOne({
@@ -60,39 +61,51 @@ router.post("/delete", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/add", packageCreateVal, validation, async (req, res) => {
-  try {
-    const { businessID, name: refName } = req.user;
-    const { name, staticIP, price, vatType, vatAmount } = req.body;
-    await Package.create({
-      businessID,
-      refName,
-      name,
-      staticIP,
-      price,
-      vatType,
-      vatAmount,
-    });
-    return res.send({ success: true });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
+router.post(
+  "/add",
+  pc("packageCreate"),
+  packageCreateVal,
+  validation,
+  async (req, res) => {
+    try {
+      const { businessID, name: refName } = req.user;
+      const { name, staticIP, price, vatType, vatAmount } = req.body;
+      await Package.create({
+        businessID,
+        refName,
+        name,
+        staticIP,
+        price,
+        vatType,
+        vatAmount,
+      });
+      return res.send({ success: true });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: error.message });
+    }
   }
-});
-router.post("/edit", packageCreateVal, validation, async (req, res) => {
-  try {
-    const { name: refName, businessID } = req.user;
-    const { _id, name, staticIP, price, vatType, vatAmount } = req.body;
-    await Package.updateOne(
-      { _id, businessID: objectID(businessID) },
-      { name, staticIP, price, vatType, vatAmount, refName }
-    );
+);
+router.post(
+  "/edit",
+  pc("packageEdit"),
+  packageCreateVal,
+  validation,
+  async (req, res) => {
+    try {
+      const { name: refName, businessID } = req.user;
+      const { _id, name, staticIP, price, vatType, vatAmount } = req.body;
+      await Package.updateOne(
+        { _id, businessID: objectID(businessID) },
+        { name, staticIP, price, vatType, vatAmount, refName }
+      );
 
-    return res.send({ success: true });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
+      return res.send({ success: true });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 module.exports = router;

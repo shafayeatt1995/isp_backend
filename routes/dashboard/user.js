@@ -4,9 +4,10 @@ const { User, Business } = require("../../models");
 const { paginate, sleep, toggle, objectID } = require("../../utils");
 const { userCreateVal, userEditVal } = require("../../validation/user");
 const { validation } = require("../../validation");
+const pc = require("../../middleware/permission");
 const router = express.Router();
 
-router.post("/fetch", async (req, res) => {
+router.post("/fetch", pc("userRead"), async (req, res) => {
   try {
     const { businessID } = req.user;
     const { page, perPage, keyword, searchBy, sort } = req.body;
@@ -48,7 +49,7 @@ router.post("/fetch", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/toggle-suspend", async (req, res) => {
+router.post("/toggle-suspend", pc("userEdit"), async (req, res) => {
   try {
     const { businessID, _id } = req.user;
     const { user } = req.body;
@@ -68,7 +69,7 @@ router.post("/toggle-suspend", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/batch-toggle-suspend", async (req, res) => {
+router.post("/batch-toggle-suspend", pc("userEdit"), async (req, res) => {
   try {
     const { businessID, _id } = req.user;
     const { ids, suspend } = req.body;
@@ -87,7 +88,7 @@ router.post("/batch-toggle-suspend", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/batch-delete", async (req, res) => {
+router.post("/batch-delete", pc("userDelete"), async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -118,7 +119,7 @@ router.post("/batch-delete", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/delete", async (req, res) => {
+router.post("/delete", pc("userDelete"), async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -151,60 +152,72 @@ router.post("/delete", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-router.post("/add", userCreateVal, validation, async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
-    const { name: refName, businessID } = req.user;
-    const { name, id, password, mobile, type } = req.body;
-    const [user] = await User.create(
-      [
-        {
-          name,
-          id,
-          password,
-          pass: password,
-          mobile,
-          type,
-          refName,
-          businessID,
-        },
-      ],
-      { session }
-    );
-    await Business.updateOne(
-      { _id: objectID(businessID) },
-      { $push: { [type + "IDs"]: objectID(user._id) } },
-      { session }
-    );
+router.post(
+  "/add",
+  pc("userCreate"),
+  userCreateVal,
+  validation,
+  async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const { name: refName, businessID } = req.user;
+      const { name, id, password, mobile, type } = req.body;
+      const [user] = await User.create(
+        [
+          {
+            name,
+            id,
+            password,
+            pass: password,
+            mobile,
+            type,
+            refName,
+            businessID,
+          },
+        ],
+        { session }
+      );
+      await Business.updateOne(
+        { _id: objectID(businessID) },
+        { $push: { [type + "IDs"]: objectID(user._id) } },
+        { session }
+      );
 
-    await session.commitTransaction();
-    await session.endSession();
-    return res.send({ success: true });
-  } catch (error) {
-    console.error(error);
-    await session.abortTransaction();
-    await session.endSession();
-    return res.status(500).json({ error: error.message });
-  }
-});
-router.post("/edit", userEditVal, validation, async (req, res) => {
-  try {
-    const { name, id, password, mobile, _id } = req.body;
-    const body = { name, id, mobile };
-    if (password) {
-      body.password = password;
-      body.pass = password;
+      await session.commitTransaction();
+      await session.endSession();
+      return res.send({ success: true });
+    } catch (error) {
+      console.error(error);
+      await session.abortTransaction();
+      await session.endSession();
+      return res.status(500).json({ error: error.message });
     }
-    await User.updateOne({ _id }, body);
-
-    return res.send({ success: true });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
   }
-});
-router.post("/update-permission", async (req, res) => {
+);
+router.post(
+  "/edit",
+  pc("userEdit"),
+  userEditVal,
+  validation,
+  async (req, res) => {
+    try {
+      const { name, id, password, mobile, _id } = req.body;
+      const body = { name, id, mobile };
+      if (password) {
+        body.password = password;
+        body.pass = password;
+      }
+      await User.updateOne({ _id }, body);
+
+      return res.send({ success: true });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+);
+router.post("/update-permission", pc("userEdit"), async (req, res) => {
   try {
     const { businessID } = req.user;
     const { permissions, _id } = req.body?.user;
