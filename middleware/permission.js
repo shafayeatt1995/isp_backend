@@ -4,10 +4,6 @@ const pc = (permission) => async (req, res, next) => {
   const { _id, isAdmin, isOwner, isReseller } = req.user;
   if (isOwner || isAdmin) {
     return next();
-  } else if (permission === "admin") {
-    if (isAdmin) return next();
-  } else if (permission === "owner") {
-    if (isOwner) return next();
   } else if (isReseller) {
     const user = await User.findOne({ _id }).select({ permissions: 1 }).lean();
     if (user.permissions.includes(permission)) return next();

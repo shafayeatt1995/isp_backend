@@ -47,11 +47,13 @@ router.post("/delete", async (req, res) => {
 });
 router.post("/add", packageCreateVal, validation, async (req, res) => {
   try {
-    const { name, staticIP, price, vatType, vatAmount } = req.body;
+    const { _id: userID, name: refName } = req.user;
+    const { name, ipType, price, vatType, vatAmount } = req.body;
     await Package.create({
-      refName: "admin",
+      userID,
+      refName,
       name,
-      staticIP,
+      ipType,
       price,
       vatType,
       vatAmount,
@@ -64,10 +66,10 @@ router.post("/add", packageCreateVal, validation, async (req, res) => {
 });
 router.post("/edit", packageCreateVal, validation, async (req, res) => {
   try {
-    const { _id, name, staticIP, price, vatType, vatAmount } = req.body;
+    const { _id, name, ipType, price, vatType, vatAmount } = req.body;
     await Package.updateOne(
       { _id },
-      { name, staticIP, price, vatType, vatAmount }
+      { name, ipType, price, vatType, vatAmount }
     );
 
     return res.send({ success: true });

@@ -3,7 +3,7 @@ const { check } = require("express-validator");
 const validate = {
   packageCreateVal: [
     check("name").trim().notEmpty().withMessage("Name is required"),
-    check("staticIP").isBoolean().withMessage("Static IP is required"),
+    check("ipType").trim().notEmpty().withMessage("IP type is required"),
     check("price")
       .isNumeric()
       .withMessage("Price is required")
